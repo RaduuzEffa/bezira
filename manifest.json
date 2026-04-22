@@ -1,16 +1,16 @@
 {
-  "name": "AI SVG Infografika",
-  "short_name": "Infografika AI",
-  "description": "Generátor vektorových infografik pomocí Gemini AI",
+  "name": "Bezira",
+  "short_name": "Bezira",
+  "description": "AI Vektorová Infografika a Nástroje",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "icon.svg",
+      "src": "logo.png",
       "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

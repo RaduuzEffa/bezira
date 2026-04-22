@@ -1,11 +1,11 @@
-const CACHE_NAME = 'svg-infografika-v2';
+const CACHE_NAME = 'svg-infografika-v3';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
     './manifest.json',
-    './icon.svg'
+    './logo.png'
 ];
 
 self.addEventListener('install', (event) => {
