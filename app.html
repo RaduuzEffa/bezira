@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bezira</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- PWA meta tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="logoSVG.png">
+    <link rel="apple-touch-icon" href="logoSVG.png">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Knihovny z CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/svg2pdf.js@2.7.0/dist/svg2pdf.umd.min.js"></script>
+    <script src="https://unpkg.com/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
+
+    <style>
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.8rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .tab-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255,255,255,0.08);
+            padding: 0.5rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .file-item-left {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            overflow: hidden;
+            color: #ddd;
+        }
+        .file-item-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+            cursor: pointer;
+        }
+        .file-item-del {
+            cursor: pointer;
+            color: #ff6b6b;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0 0.3rem;
+            transition: color 0.2s;
+        }
+        .file-item-del:hover {
+            color: #ff3333;
+        }
+        input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="glass-panel">
+            <div class="header-left" style="display: flex; align-items: center; gap: 1rem;">
+                <img src="logoSVG.png" alt="Bezira Logo" style="height: 48px; width: auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                <div>
+                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700; background: linear-gradient(90deg, #fff, #a5b4fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Bezira</h1>
+                </div>
+            </div>
+            <div class="header-right" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="text" id="modelName" value="gemini-2.5-flash" placeholder="Model" title="Název Gemini modelu" style="padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); color: white; width: 150px; font-family: inherit;">
+                    <input type="password" id="apiKey" placeholder="Vlož sem svůj Gemini API klíč" style="padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); color: white; width: 250px; font-family: inherit;">
+                </div>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent); font-size: 0.8rem; text-decoration: none;">Získej API klíč zdarma zde ↗</a>
+            </div>
+        </header>
+
+        <main>
+            <aside class="glass-panel" style="display: flex; flex-direction: column; max-height: calc(100vh - 120px); overflow-y: auto;">
+                
+                <!-- HLAVNÍ MENU NÁSTROJŮ -->
+                <div class="tabs">
+                    <button id="tabAi" class="tab-btn active">✨ AI Tvorba</button>
+                    <button id="tabTrace" class="tab-btn" style="background: rgba(16, 185, 129, 0.2); border-color: #10b981;">📐 Vektorizace</button>
+                </div>
+
+                <!-- MODUL 1: AI GENERÁTOR -->
+                <div id="contentAi" class="tab-content active">
+                    <div class="settings-group" style="margin-bottom: 1.5rem;">
+                        <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem; font-weight: 600;">1. Formát plátna (Poměr stran)</h2>
+                        <select id="aspectRatio" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); color: white; font-family: inherit; font-size: 0.95rem; cursor: pointer;">
+                            <option value="16:9">16:9 (Na šířku, např. prezentace/monitor)</option>
+                            <option value="9:16">9:16 (Na výšku, např. Stories/Reels)</option>
+                            <option value="4:3">4:3 (Na šířku, klasický formát)</option>
+                            <option value="3:4">3:4 (Na výšku, leták/plakát)</option>
+                            <option value="3:2">3:2 (Fotografie na šířku)</option>
+                            <option value="2:3">2:3 (Fotografie na výšku)</option>
+                            <option value="1:1">1:1 (Čtverec, např. Instagram/ikona)</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-group" style="margin-bottom: 1.5rem;">
+                        <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem; font-weight: 600;">2. Vizuální styl (Obrázky)</h2>
+                        <input type="file" id="styleUpload" multiple accept="image/jpeg, image/png, image/webp" style="display: none;">
+                        <button id="addStyleBtn" class="btn-secondary" style="width: 100%; padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; border: 1px dashed var(--accent); background: rgba(59, 130, 246, 0.1); color: white; cursor: pointer;">
+                            + Nahrát referenční obrázek stylu
+                        </button>
+                        <div id="styleList" class="file-list"></div>
+                    </div>
+
+                    <div class="settings-group" style="margin-bottom: 1.5rem;">
+                        <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem; font-weight: 600;">3. Data a Zdroje (Dokumenty)</h2>
+                        <input type="file" id="dataUpload" multiple accept=".pdf,audio/*,.txt,.csv" style="display: none;">
+                        <button id="addDataBtn" class="btn-secondary" style="width: 100%; padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; border: 1px dashed #a5b4fc; background: rgba(165, 180, 252, 0.1); color: white; cursor: pointer;">
+                            + Nahrát dokument k analýze (PDF/TXT/Audio)
+                        </button>
+                        <div id="dataList" class="file-list"></div>
+                    </div>
+
+                    <div class="settings-group" style="margin-bottom: 1rem;">
+                        <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem; font-weight: 600;">4. Zadání (Prompt)</h2>
+                        <textarea id="prompt" placeholder="Např.: 'Načti data ze zaškrtnutých dokumentů a vytvoř grafy. Použij barvy z obrázků nahoře.' Nebo vlož URL na web..." style="width: 100%; height: 120px; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); color: white; font-family: inherit; resize: vertical; font-size: 0.95rem; line-height: 1.5;"></textarea>
+                    </div>
+                    
+                    <button id="generateBtn" style="padding: 1.2rem; border-radius: 8px; border: none; background: var(--accent); color: white; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); width: 100%;">
+                        ✨ Generovat SVG přes AI
+                    </button>
+                </div>
+
+                <!-- MODUL 2: VEKTORIZACE (KOMBINOVANÁ) -->
+                <div id="contentTrace" class="tab-content">
+                    <div class="settings-group" style="margin-bottom: 1.5rem;">
+                        <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem; font-weight: 600;">1. Nahrát raster k vektorizaci</h2>
+                        <input type="file" id="traceUpload" accept="image/jpeg, image/png, image/webp" style="display: none;">
+                        <button id="addTraceBtn" class="btn-secondary" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px dashed #10b981; background: rgba(16, 185, 129, 0.1); color: white; cursor: pointer; font-weight: 600;">
+                            + Zvolit obrázek (Logo/Ikona)
+                        </button>
+                        <div id="traceFilePreview" style="margin-top: 1rem; text-align: center; min-height: 50px;">
+                            <span style="font-size: 0.8rem; opacity: 0.5;">Zatím není nahrán žádný obrázek.</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-group" style="margin-bottom: 1.5rem; background: rgba(16, 185, 129, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <h2 style="font-size: 1rem; margin-bottom: 1rem; font-weight: 600; color: #10b981;">A) Pokročilá Matematická Vektorizace</h2>
+                        <p style="font-size: 0.8rem; margin-bottom: 1rem; color: #aaa;">Přesné obkreslení tvarů s aplikovaným vyhlazením hran proti tvorbě "krystalů" a šumu.</p>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.3rem;">
+                                <span>Vyhlazení hran (odstraní šum):</span>
+                                <span id="valBlur">5</span>
+                            </label>
+                            <input type="range" id="optBlur" min="0" max="10" value="5" style="width: 100%; accent-color: #10b981;">
+                        </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.3rem;">
+                                <span>Plynulost křivek (hladší zaoblení):</span>
+                                <span id="valSmooth">5</span>
+                            </label>
+                            <input type="range" id="optSmooth" min="1" max="20" value="5" style="width: 100%; accent-color: #10b981;">
+                        </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.3rem;">
+                                <span>Počet barev:</span>
+                                <span id="valColors">4</span>
+                            </label>
+                            <input type="range" id="optColors" min="2" max="16" value="4" style="width: 100%; accent-color: #10b981;">
+                        </div>
+
+                        <button id="traceMathBtn" style="padding: 1rem; border-radius: 8px; border: none; background: #10b981; color: white; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; width: 100%;">
+                            📐 Obkreslit s vyhlazením (Offline)
+                        </button>
+                    </div>
+
+                    <div class="settings-group" style="margin-bottom: 0;">
+                        <h2 style="font-size: 1rem; margin-bottom: 0.5rem; font-weight: 600; color: var(--accent);">B) Volná AI Interpretace</h2>
+                        <p style="font-size: 0.8rem; margin-bottom: 1rem; color: #aaa;">Generuje absolutně čistý kód, ale tvary "odhaduje" od nuly (často halucinuje, dobré jen na velmi základní geometrii).</p>
+                        <button id="traceAiBtn" style="padding: 1rem; border-radius: 8px; border: 1px solid var(--accent); background: rgba(59, 130, 246, 0.1); color: white; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; width: 100%;">
+                            ✨ Nechat AI překreslit logo (Gemini)
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- SDÍLENÁ EXPORTNÍ SEKCE A ERROR -->
+                <div id="errorBox" class="error-box" style="display: none; margin-top: 1rem; margin-bottom: 1rem;"></div>
+                
+                <div id="exportSection" class="export-section" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+                    <h3 style="margin-bottom: 0.5rem;">Export výsledku</h3>
+                    <button id="downloadSvgBtn" class="btn-secondary" style="margin-bottom: 0.5rem;">
+                        ⬇️ Stáhnout čisté SVG
+                    </button>
+                    <button id="downloadPdfBtn" class="btn-secondary">
+                        ⬇️ Stáhnout vektorové PDF
+                    </button>
+                    <p class="export-hint" style="margin-top: 0.5rem;">Oba formáty lze otevřít a plně editovat v Affinity / Illustratoru.</p>
+                </div>
+            </aside>
+
+            <section class="glass-panel canvas-section">
+                <h2 class="canvas-header">
+                    <span>Náhled plátna (Živé zobrazení)</span>
+                    <span id="resultTitle" class="result-title"></span>
+                </h2>
+                <div id="svgContainerWrapper" class="svg-container-wrapper">
+                    <div id="emptyState" class="empty-state">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem; display: block; opacity: 0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        Plátno je zatím prázdné.
+                    </div>
+                    <div id="loadingState" class="loading-state" style="display: none;">
+                        <div class="spinner"></div>
+                        <span id="loadingText">Pracuji...</span>
+                    </div>
+                    <div id="svgContent" class="svg-content" style="display: none;"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script type="module">
+        import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
+
+        let currentResult = null;
+        let uploadedStyles = [];
+        let uploadedData = [];
+        let fileIdCounter = 0;
+
+        // UI TABS LOGIKA
+        const tabAi = document.getElementById('tabAi');
+        const tabTrace = document.getElementById('tabTrace');
+        const contentAi = document.getElementById('contentAi');
+        const contentTrace = document.getElementById('contentTrace');
+
+        tabAi.addEventListener('click', () => {
+            tabAi.classList.add('active');
+            tabAi.style.background = 'var(--accent)';
+            tabAi.style.borderColor = 'var(--accent)';
+            tabTrace.classList.remove('active');
+            tabTrace.style.background = 'rgba(16, 185, 129, 0.2)';
+            tabTrace.style.borderColor = '#10b981';
+            contentAi.classList.add('active');
+            contentTrace.classList.remove('active');
+            hideError();
+        });
+
+        tabTrace.addEventListener('click', () => {
+            tabTrace.classList.add('active');
+            tabTrace.style.background = '#10b981';
+            tabTrace.style.borderColor = '#10b981';
+            tabTrace.style.boxShadow = '0 4px 14px 0 rgba(16, 185, 129, 0.39)';
+            tabAi.classList.remove('active');
+            tabAi.style.background = 'rgba(255,255,255,0.05)';
+            tabAi.style.borderColor = 'var(--border)';
+            tabAi.style.boxShadow = 'none';
+            contentTrace.classList.add('active');
+            contentAi.classList.remove('active');
+            hideError();
+        });
+
+        const elements = {
+            apiKey: document.getElementById('apiKey'),
+            modelName: document.getElementById('modelName'),
+            aspectRatio: document.getElementById('aspectRatio'),
+            styleUpload: document.getElementById('styleUpload'),
+            dataUpload: document.getElementById('dataUpload'),
+            addStyleBtn: document.getElementById('addStyleBtn'),
+            addDataBtn: document.getElementById('addDataBtn'),
+            styleList: document.getElementById('styleList'),
+            dataList: document.getElementById('dataList'),
+            prompt: document.getElementById('prompt'),
+            generateBtn: document.getElementById('generateBtn'),
+            
+            errorBox: document.getElementById('errorBox'),
+            exportSection: document.getElementById('exportSection'),
+            downloadSvgBtn: document.getElementById('downloadSvgBtn'),
+            downloadPdfBtn: document.getElementById('downloadPdfBtn'),
+            emptyState: document.getElementById('emptyState'),
+            loadingState: document.getElementById('loadingState'),
+            loadingText: document.getElementById('loadingText'),
+            svgContent: document.getElementById('svgContent'),
+            resultTitle: document.getElementById('resultTitle'),
+        };
+
+        elements.apiKey.value = localStorage.getItem('gemini_api_key') || '';
+
+        function showError(msg) {
+            elements.errorBox.textContent = msg;
+            elements.errorBox.style.display = 'block';
+        }
+
+        function hideError() {
+            elements.errorBox.style.display = 'none';
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function renderList(list, containerId, type) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            list.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `
+                    <div class="file-item-left">
+                        <input type="checkbox" id="chk_${item.id}" ${item.active ? 'checked' : ''}>
+                        <label for="chk_${item.id}" class="file-item-name" title="${item.file.name}">${item.file.name}</label>
+                    </div>
+                    <button class="file-item-del" title="Smazat">×</button>
+                `;
+                
+                div.querySelector('input').addEventListener('change', (e) => {
+                    item.active = e.target.checked;
+                });
+                
+                div.querySelector('.file-item-del').addEventListener('click', () => {
+                    if (type === 'style') {
+                        uploadedStyles = uploadedStyles.filter(x => x.id !== item.id);
+                        renderList(uploadedStyles, 'styleList', 'style');
+                    } else {
+                        uploadedData = uploadedData.filter(x => x.id !== item.id);
+                        renderList(uploadedData, 'dataList', 'data');
+                    }
+                });
+
+                container.appendChild(div);
+            });
+        }
+
+        // ==========================================
+        // LOGIKA PRO AI GENERÁTOR
+        // ==========================================
+        elements.addStyleBtn.addEventListener('click', () => elements.styleUpload.click());
+        elements.styleUpload.addEventListener('change', (e) => {
+            Array.from(e.target.files).forEach(file => {
+                if (file.type === 'image/svg+xml') {
+                    showError("SVG formát nelze načíst jako referenční obrázek pro analýzu. Omlouvám se, použij JPG nebo PNG.");
+                    return;
+                }
+                uploadedStyles.push({ id: ++fileIdCounter, file, active: true });
+            });
+            renderList(uploadedStyles, 'styleList', 'style');
+            e.target.value = '';
+        });
+
+        elements.addDataBtn.addEventListener('click', () => elements.dataUpload.click());
+        elements.dataUpload.addEventListener('change', (e) => {
+            Array.from(e.target.files).forEach(file => {
+                uploadedData.push({ id: ++fileIdCounter, file, active: true });
+            });
+            renderList(uploadedData, 'dataList', 'data');
+            e.target.value = '';
+        });
+
+        elements.generateBtn.addEventListener('click', async () => {
+            const key = elements.apiKey.value.trim();
+            const promptText = elements.prompt.value.trim();
+            
+            const activeStyles = uploadedStyles.filter(i => i.active);
+            const activeData = uploadedData.filter(i => i.active);
+
+            if (!key) {
+                showError('Nejprve zadej svůj Gemini API klíč vpravo nahoře.');
+                return;
+            }
+            if (!promptText && activeStyles.length === 0 && activeData.length === 0) {
+                showError('Zadej textový prompt nebo aktivuj nějaké soubory k analýze.');
+                return;
+            }
+
+            localStorage.setItem('gemini_api_key', key);
+            hideError();
+            
+            elements.generateBtn.disabled = true;
+            elements.emptyState.style.display = 'none';
+            elements.svgContent.style.display = 'none';
+            elements.loadingState.style.display = 'flex';
+            elements.exportSection.style.display = 'none';
+            elements.resultTitle.textContent = '';
+            currentResult = null;
+
+            try {
+                const targetModelName = elements.modelName.value.trim() || "gemini-2.5-flash";
+                const genAI = new GoogleGenerativeAI(key);
+                const model = genAI.getGenerativeModel({ model: targetModelName });
+
+                const ratioMapping = {
+                    '16:9': 'viewBox="0 0 1600 900"',
+                    '9:16': 'viewBox="0 0 900 1600"',
+                    '4:3': 'viewBox="0 0 1200 900"',
+                    '3:4': 'viewBox="0 0 900 1200"',
+                    '3:2': 'viewBox="0 0 1500 1000"',
+                    '2:3': 'viewBox="0 0 1000 1500"',
+                    '1:1': 'viewBox="0 0 1000 1000"'
+                };
+                const selectedRatio = elements.aspectRatio.value;
+                const viewBoxString = ratioMapping[selectedRatio] || 'viewBox="0 0 1600 900"';
+
+                const parts = [];
+                let fileInstructions = '';
+                
+                elements.loadingText.textContent = 'Zpracovávám podklady...';
+
+                for (const item of activeStyles) {
+                    if (item.file.size > 15 * 1024 * 1024) throw new Error(`Obrázek ${item.file.name} je moc velký (max 15 MB).`);
+                    const base64str = await fileToBase64(item.file);
+                    parts.push({
+                        inlineData: {
+                            data: base64str.split(',')[1],
+                            mimeType: item.file.type || 'image/jpeg'
+                        }
+                    });
+                    fileInstructions += `- OBRÁZKOVÁ REFERENCE (${item.file.name}): Přísně analyzuj její barvy, stíny, tloušťku čar a estetiku. Vytvořené SVG musí tento styl napodobovat.\n`;
+                }
+
+                for (const item of activeData) {
+                    if (item.file.size > 15 * 1024 * 1024) throw new Error(`Dokument ${item.file.name} je moc velký (max 15 MB).`);
+                    const base64str = await fileToBase64(item.file);
+                    parts.push({
+                        inlineData: {
+                            data: base64str.split(',')[1],
+                            mimeType: item.file.type || 'application/octet-stream'
+                        }
+                    });
+                    fileInstructions += `- DATOVÝ ZDROJ (${item.file.name}): Přečti klíčová data z tohoto souboru a zpracuj je do textů/grafů v infografice.\n`;
+                }
+
+                elements.loadingText.textContent = 'Odesílám do AI a tvořím vektory...';
+
+                const systemInstruction = `
+Jsi expertní UX/UI designér, analytik dat a mistr vektorové grafiky (SVG).
+Tento systém generuje vizuálně úchvatné a přesné SVG infografiky.
+
+Kritická pravidla:
+1. FORMÁT: Vrať POUZE validní JSON. Žádný markdown ani text okolo! Formát: { "title": "Název", "svg_code": "<svg>...</svg>" }
+2. ROZMĚRY: <svg> element musí mít xmlns="http://www.w3.org/2000/svg" a atribut ${viewBoxString}. Neuváděj žádné atributy width/height, pouze viewBox.
+3. STYL: Uvnitř SVG použij <style>. Použij moderní vektorové efekty (drop-shadow, přechody). POKUD JE PŘIPOJEN STYLOVÝ OBRÁZEK, PŘESNĚ ODVOĎ JEHO BARVY A ESTETIKU.
+4. TEXTY: Texty výhradně v tagu <text>. Pokud uživatel nahrál dokument, použij data/čísla z dokumentu. Font: system-ui.
+5. Zákaz <image> s base64 rastry! Chceme čisté, upravitelné vektorové křivky (<path>, <rect> atd.).
+
+Instrukce k nahraným souborům (STRIKTNĚ RESPEKTUJ):
+${fileInstructions}
+`;
+
+                const finalPrompt = `Systémové pokyny:\n${systemInstruction}\n\nUživatelské zadání a požadavky:\n${promptText}`;
+                parts.push({ text: finalPrompt });
+
+                const chatSession = model.startChat({
+                    generationConfig: {
+                        temperature: 0.7,
+                        responseMimeType: "application/json",
+                    }
+                });
+
+                const response = await chatSession.sendMessage(parts);
+                const text = response.response.text();
+                
+                const parsed = JSON.parse(text);
+                if (parsed.svg_code) {
+                    currentResult = {
+                        title: parsed.title || 'Infografika',
+                        svg: parsed.svg_code
+                    };
+                    
+                    elements.svgContent.innerHTML = currentResult.svg;
+                    elements.resultTitle.textContent = currentResult.title;
+                    elements.loadingState.style.display = 'none';
+                    elements.svgContent.style.display = 'flex';
+                    elements.exportSection.style.display = 'flex';
+                    
+                } else {
+                    throw new Error('Odpověď neobsahovala validní SVG kód.');
+                }
+            } catch (err) {
+                console.error(err);
+                if (err.message.includes('is not found')) {
+                    showError('Zvolený model neexistuje. Zkontroluj název modelu.');
+                } else if (err.message.includes('API key not valid')) {
+                    showError('Tento API klíč je neplatný. Zkus ho vygenerovat znovu.');
+                } else if (err.message.includes('Quota exceeded') || err.message.includes('limit: 0')) {
+                    showError('Model je zablokován (Limit: 0) nebo jsi vyčerpal limit. Změň model na gemini-2.5-flash.');
+                } else if (err.message.includes('503')) {
+                    showError('Google servery jsou aktuálně přetížené (Chyba 503). Zkus to prosím znovu za pár minut.');
+                } else {
+                    showError('Chyba při generování: ' + err.message);
+                }
+                elements.loadingState.style.display = 'none';
+                elements.emptyState.style.display = 'block';
+            } finally {
+                elements.generateBtn.disabled = false;
+            }
+        });
+
+        // ==========================================
+        // LOGIKA PRO VEKTORIZACI (KOMBINOVANOU)
+        // ==========================================
+        let fileToTrace = null;
+        let base64ToTrace = null;
+        const addTraceBtn = document.getElementById('addTraceBtn');
+        const traceUpload = document.getElementById('traceUpload');
+        const traceFilePreview = document.getElementById('traceFilePreview');
+        const traceMathBtn = document.getElementById('traceMathBtn');
+        const traceAiBtn = document.getElementById('traceAiBtn');
+        
+        const optBlur = document.getElementById('optBlur');
+        const valBlur = document.getElementById('valBlur');
+        const optSmooth = document.getElementById('optSmooth');
+        const valSmooth = document.getElementById('valSmooth');
+        const optColors = document.getElementById('optColors');
+        const valColors = document.getElementById('valColors');
+
+        optBlur.addEventListener('input', (e) => valBlur.textContent = e.target.value);
+        optSmooth.addEventListener('input', (e) => valSmooth.textContent = e.target.value);
+        optColors.addEventListener('input', (e) => valColors.textContent = e.target.value);
+
+        addTraceBtn.addEventListener('click', () => traceUpload.click());
+        traceUpload.addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                fileToTrace = e.target.files[0];
+                if (fileToTrace.type === 'image/svg+xml') {
+                    showError('Tento soubor už je SVG vektor. Zvolte JPG, PNG nebo WEBP.');
+                    return;
+                }
+                hideError();
+                base64ToTrace = await fileToBase64(fileToTrace);
+                traceFilePreview.innerHTML = `
+                    <img src="${base64ToTrace}" style="max-width: 100%; max-height: 120px; border-radius: 8px; border: 2px solid rgba(16, 185, 129, 0.5);">
+                    <div style="font-size: 0.8rem; margin-top: 0.5rem; color: #10b981;">Připraveno k vektorizaci</div>
+                `;
+            }
+        });
+
+        // A) MATEMATICKÁ VEKTORIZACE S VYHLAZENÍM
+        traceMathBtn.addEventListener('click', async () => {
+            if (!base64ToTrace) {
+                showError('Nejprve vyber obrázek k vektorizaci.');
+                return;
+            }
+            hideError();
+            
+            elements.emptyState.style.display = 'none';
+            elements.svgContent.style.display = 'none';
+            elements.loadingState.style.display = 'flex';
+            elements.exportSection.style.display = 'none';
+            elements.resultTitle.textContent = 'Trasu křivky...';
+            elements.loadingText.textContent = 'Aplikuji vyhlazení a matematicky trasuji (offline)...';
+            
+            traceMathBtn.disabled = true;
+
+            setTimeout(() => {
+                try {
+                    const options = {
+                        corsenabled: false,
+                        ltres: parseFloat(optSmooth.value), // Linear error (hlavní parametr pro hladké křivky)
+                        qtres: parseFloat(optSmooth.value), // Quadratic error
+                        pathomit: 8, // Vymaže malé smetí
+                        rightangleenhance: false, // Zabrání zubům (vypne umělé rohy)
+                        colorsampling: 1,
+                        numberofcolors: parseInt(optColors.value),
+                        mincolorratio: 0.02,
+                        colorquantcycles: 3,
+                        blurradius: parseInt(optBlur.value), // KLÍČOVÉ PROTI KRYSTALŮM
+                        blurdelta: 20
+                    };
+
+                    ImageTracer.imageToSVG(
+                        base64ToTrace,
+                        function(svgstr) {
+                            currentResult = {
+                                title: fileToTrace.name.split('.')[0] + '_vektor',
+                                svg: svgstr
+                            };
+                            
+                            elements.svgContent.innerHTML = currentResult.svg;
+                            elements.resultTitle.textContent = currentResult.title;
+                            elements.loadingState.style.display = 'none';
+                            elements.svgContent.style.display = 'flex';
+                            elements.exportSection.style.display = 'flex';
+                            
+                            traceMathBtn.disabled = false;
+                        },
+                        options
+                    );
+                } catch(e) {
+                    showError('Chyba při matematické vektorizaci: ' + e.message);
+                    elements.loadingState.style.display = 'none';
+                    elements.emptyState.style.display = 'block';
+                    traceMathBtn.disabled = false;
+                }
+            }, 100);
+        });
+
+        // B) AI VEKTORIZACE (RE-DESIGN)
+        traceAiBtn.addEventListener('click', async () => {
+            const key = elements.apiKey.value.trim();
+            if (!key) {
+                showError('Nejprve zadej svůj Gemini API klíč vpravo nahoře.');
+                return;
+            }
+            if (!base64ToTrace) {
+                showError('Nejprve vyber obrázek k vektorizaci.');
+                return;
+            }
+            hideError();
+            
+            elements.emptyState.style.display = 'none';
+            elements.svgContent.style.display = 'none';
+            elements.loadingState.style.display = 'flex';
+            elements.exportSection.style.display = 'none';
+            elements.resultTitle.textContent = 'Trasu křivky...';
+            elements.loadingText.textContent = 'Odesílám do AI k odhadu (výsledek bude volná interpretace)...';
+            
+            traceAiBtn.disabled = true;
+
+            try {
+                const targetModelName = elements.modelName.value.trim() || "gemini-2.5-flash";
+                const genAI = new GoogleGenerativeAI(key);
+                const model = genAI.getGenerativeModel({ model: targetModelName });
+
+                const parts = [
+                    {
+                        inlineData: {
+                            data: base64ToTrace.split(',')[1],
+                            mimeType: fileToTrace.type || 'image/jpeg'
+                        }
+                    },
+                    {
+                        text: `
+Jsi expertní tvůrce vektorové grafiky a čistého kódu.
+Tvým úkolem je podívat se na přiložené rastrové logo (ikonu) a vytvořit jeho absolutně přesnou vektorovou kopii ve formátu SVG.
+Je kritické, aby byl výsledek profesionální, tzn. žádné chaotické mnohoúhelníky (krystaly), ale čisté geometrické tvary a přesné bezierovy křivky (<path>, <rect>, <circle> atd.). Ignoruj kompresní šum v rastru.
+
+1. FORMÁT: Vrať POUZE validní JSON. Žádný markdown. Formát: { "title": "Název", "svg_code": "<svg>...</svg>" }
+2. ROZMĚRY: Vyber logický \`viewBox\`, obvykle čtvercový (např. 0 0 500 500) nebo obdélníkový podle tvaru loga. Neuváděj \`width\` a \`height\`.
+3. VEKTORY: Pouze čistý geometrický design, zachovej původní barvy a styl loga.
+`
+                    }
+                ];
+
+                const chatSession = model.startChat({
+                    generationConfig: {
+                        temperature: 0.2, // nízká teplota pro přesnost reprodukce
+                        responseMimeType: "application/json",
+                    }
+                });
+
+                const response = await chatSession.sendMessage(parts);
+                const text = response.response.text();
+                
+                const parsed = JSON.parse(text);
+                if (parsed.svg_code) {
+                    currentResult = {
+                        title: parsed.title || 'VektoroveLogo',
+                        svg: parsed.svg_code
+                    };
+                    
+                    elements.svgContent.innerHTML = currentResult.svg;
+                    elements.resultTitle.textContent = currentResult.title;
+                    elements.loadingState.style.display = 'none';
+                    elements.svgContent.style.display = 'flex';
+                    elements.exportSection.style.display = 'flex';
+                    
+                } else {
+                    throw new Error('Odpověď neobsahovala validní SVG kód.');
+                }
+            } catch (err) {
+                console.error(err);
+                showError('Chyba při překreslování: ' + err.message);
+                elements.loadingState.style.display = 'none';
+                elements.emptyState.style.display = 'block';
+            } finally {
+                traceAiBtn.disabled = false;
+            }
+        });
+
+        // ==========================================
+        // EXPORTNÍ SKRIPTY
+        // ==========================================
+        elements.downloadSvgBtn.addEventListener('click', () => {
+            if (!currentResult?.svg) return;
+            const blob = new Blob([currentResult.svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentResult.title.replace(/\s+/g, '_')}.svg`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        elements.downloadPdfBtn.addEventListener('click', async () => {
+            if (!currentResult?.svg) return;
+            const { jsPDF } = window.jspdf;
+            const svgElement = elements.svgContent.querySelector('svg');
+            if (!svgElement) return;
+
+            // Zkusíme vytáhnout width/height z viewBoxu, nebo dáme default
+            let width = 1600, height = 900;
+            const viewBox = svgElement.getAttribute('viewBox');
+            if (viewBox) {
+                const parts = viewBox.split(' ');
+                if (parts.length === 4) {
+                    width = parseFloat(parts[2]);
+                    height = parseFloat(parts[3]);
+                }
+            } else if (svgElement.getAttribute('width')) {
+                width = parseFloat(svgElement.getAttribute('width'));
+                height = parseFloat(svgElement.getAttribute('height'));
+            }
+
+            const orientation = width > height ? 'l' : 'p';
+            const pdf = new jsPDF(orientation, 'pt', [width, height]);
+            
+            try {
+                await pdf.svg(svgElement, { x: 0, y: 0, width: width, height: height });
+                pdf.save(`${currentResult.title.replace(/\s+/g, '_')}.pdf`);
+            } catch(err) {
+                alert("Chyba při exportu PDF. Zkus jednodušší SVG. Detail: " + err.message);
+            }
+        });
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+    </script>
+</body>
+</html>
